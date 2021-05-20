@@ -269,6 +269,7 @@ uint32_t mainbar_add_tile( uint16_t x, uint16_t y, const char *id ) {
     return( tile_entrys - 1 );
 }
 
+
 bool mainbar_add_tile_hibernate_cb( uint32_t tile_number, MAINBAR_CALLBACK_FUNC hibernate_cb ) {
     /*
      * check if mainbar already initialized

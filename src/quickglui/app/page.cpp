@@ -26,7 +26,7 @@ void Page::onChildAdded(Widget& child, const TypeInfo& type) {
 void Page::assign(lv_obj_t* newHandle) {  
     native = newHandle;
 
-    pageStyle = Style(ws_get_mainbar_style(), true);
+    pageStyle = Style(ws_get_app_style(), true);
     onInitializing();
 
     //onChildAddedHandler(std::bind(&Page::onChildAdded, this, std::placeholders::_1, std::placeholders::_2));

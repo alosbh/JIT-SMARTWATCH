@@ -189,10 +189,21 @@ bool update_http_ota_event_cb( EventBits_t event, void *arg ) {
 bool update_wifictl_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
         case WIFICTL_CONNECT:
-            if ( update_setup_get_autosync() && reset == false ) {
+            
+            log_i("Wifi connected Check for update");
+
+           if ((boot_finish==1)&&( reset == false )){ 
+ 
+                log_i("Wifi connected and boot finished Check for update");
                 update_check_version();
                 break;
             }
+                      
+           // if ( update_setup_get_autosync() && reset == false ) {
+           //     update_check_version();
+           //     break;
+           // }
+
     }
     return( true );
 }
@@ -275,10 +286,25 @@ void update_Task( void * pvParameters ) {
             lv_label_set_text( update_status_label, (const char*)version_msg );
             lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
             setup_set_indicator( update_setup_icon, ICON_INDICATOR_1 );
-            if ( last_firmware_version < firmware_version ) {
-                bluetooth_message_queue_msg("{\"t\":\"notify\",\"id\":1575479849,\"src\":\"Update\",\"title\":\"update\",\"body\":\"new firmware version available\"}");
-                last_firmware_version = firmware_version;
-            }
+
+            #ifdef          AUTO_UPDATE_AND_RESTART
+                        
+                       xEventGroupClearBits( update_event_handle, UPDATE_REQUEST | UPDATE_GET_VERSION_REQUEST );
+                       xEventGroupSetBits( update_event_handle, UPDATE_REQUEST );
+                       xTaskCreate(    update_Task,
+                                       "Update Task_2",
+                                       5000,
+                                       NULL,
+                                       1,
+                                       &_update_Task );
+                    
+            #endif 
+
+
+          //  if ( last_firmware_version < firmware_version ) {
+          //      bluetooth_message_queue_msg("{\"t\":\"notify\",\"id\":1575479849,\"src\":\"Update\",\"title\":\"update\",\"body\":\"new firmware version available\"}");
+          //      last_firmware_version = firmware_version;
+         //   }
         }
         else if ( firmware_version == atoll( __FIRMWARE__ ) ) {
             lv_label_set_text( update_status_label, "yeah! up to date ..." );
@@ -304,6 +330,22 @@ void update_Task( void * pvParameters ) {
                 lv_label_set_text( update_status_label, "update ok, turn off and on!" );
                 lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
                 lv_label_set_text( update_btn_label, "restart");
+
+#ifdef          AUTO_UPDATE_AND_RESTART
+                //Adicionado para realizar o Auto Reset 
+                delay(500);
+                TTGOClass *ttgo = TTGOClass::getWatch();
+                log_i("System reboot by user");
+                motor_vibe(20);
+                delay(20);
+                display_standby();
+                ttgo->stopLvglTick();
+                SPIFFS.end();
+                log_i("SPIFFS unmounted!");
+                delay(500);
+                ESP.restart();    
+#endif
+
             }
             else {
                 reset = false;

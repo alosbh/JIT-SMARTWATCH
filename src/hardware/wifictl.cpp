@@ -44,9 +44,20 @@ callback_t *wifictl_callback = NULL;
 
 void wifictl_send_event_cb( EventBits_t event, char *msg );
 bool wifictl_powermgm_event_cb( EventBits_t event, void *arg );
+bool wifictl_powermgm_loop_event_cb( EventBits_t event, void *arg );
+
+
 void wifictl_StartTask( void );
 void wifictl_Task( void * pvParameters );
+void  wifi_restablish_Task( void * pvParameters);
+
 TaskHandle_t _wifictl_Task;
+
+volatile uint8_t ct_Wifi_retry=0;
+volatile int wifi_connected=0; 
+
+TaskHandle_t _wifi_restabilsh_Task;
+
 
 char *wifiname=NULL;
 char *wifipassword=NULL;
@@ -84,6 +95,14 @@ void wifictl_setup( void ) {
      * limit wifi bandwidth to 20Mhz channel width
      */
     esp_wifi_set_bandwidth( ESP_IF_WIFI_STA, WIFI_BW_HT20 );
+
+    //Habilita o wifi no modo standby
+    wifictl_set_enable_on_standby(true);
+
+    //Habilita o modo Auto on 
+    wifictl_set_autoon(true);
+  
+
     /*
      * register WiFi events
      */
@@ -94,9 +113,12 @@ void wifictl_setup( void ) {
             wifictl_send_event_cb( WIFICTL_DISCONNECT, (void *)"wait for WPS" );
         }
         else {
-            wifictl_set_event( WIFICTL_SCAN );
+            //wifictl_set_event( WIFICTL_SCAN );
             wifictl_send_event_cb( WIFICTL_DISCONNECT, (void *)"scan ..." );
-            WiFi.scanNetworks( true );
+            //WiFi.scanNetworks( true );
+
+          Serial.println("Evento STA Desconectado");
+          vTaskResume( _wifi_restabilsh_Task);
         }
     }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
 
@@ -108,7 +130,8 @@ void wifictl_setup( void ) {
             for ( int entry = 0 ; entry < NETWORKLIST_ENTRYS ; entry++ ) {
                 if ( !strcmp( wifictl_config.networklist[ entry ].ssid,  WiFi.SSID(i).c_str() ) ) {
                     wifictl_send_event_cb( WIFICTL_SCAN, (void *)"connecting ..." );
-                    WiFi.begin( wifictl_config.networklist[ entry ].ssid, wifictl_config.networklist[ entry ].password );
+                    //WiFi.begin( wifictl_config.networklist[ entry ].ssid, wifictl_config.networklist[ entry ].password );
+                    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
                     return;
                 }
             }
@@ -147,7 +170,8 @@ void wifictl_setup( void ) {
         else {
             wifictl_set_event( WIFICTL_SCAN );
             wifictl_send_event_cb( WIFICTL_ON, (void *)"scan ..." );
-            WiFi.scanNetworks( true );
+            //WiFi.scanNetworks( true );
+            WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
         }
     }, WiFiEvent_t::SYSTEM_EVENT_WIFI_READY );
 
@@ -177,23 +201,68 @@ void wifictl_setup( void ) {
     /*
      * Add wifictl task
      */
-    xTaskCreatePinnedToCore(  wifictl_Task,     /* Function to implement the task */
-                              "wifictl Task",   /* Name of the task */
-                              3000,             /* Stack size in words */
-                              NULL,             /* Task input parameter */
-                              1,                /* Priority of the task */
-                              &_wifictl_Task,   /* Task handle. */
+
+    xTaskCreatePinnedToCore(  wifictl_Task,                   /* Function to implement the task */
+                              "wifictl Task",                 /* Name of the task */
+                              3000,                           /* Stack size in words */
+                              NULL,                           /* Task input parameter */
+                              2,                              /* Priority of the task */
+                              &_wifictl_Task,                 /* Task handle. */
                               0 );
     vTaskSuspend( _wifictl_Task );
+
+  xTaskCreatePinnedToCore(    wifi_restablish_Task,           /* Function to implement the task */
+                              "wifi restablish Task",         /* Name of the task */
+                              3000,                           /* Stack size in words */
+                              NULL,                           /* Task input parameter */
+                              1,                              /* Priority of the task */
+                              &_wifi_restabilsh_Task,         /* Task handle. */
+                              0 );
+    vTaskSuspend( _wifi_restabilsh_Task );
     /*
      * register powermgm callback function
      */
     powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, wifictl_powermgm_event_cb, "powermgm wifictl" );
+    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, wifictl_powermgm_loop_event_cb, "wifictl" );
     /*
      * set default state after init
      */
     wifictl_set_event( WIFICTL_OFF );
 }
+
+
+void wifi_restablish_Task( void * pvParameters) 
+{ 
+      while(1)
+      {
+              if (WiFi.status() != WL_CONNECTED)
+              {
+                ct_Wifi_retry++;
+                wifi_connected=-1;
+
+                Serial.println(" Tentando conectar....");
+                Serial.println(ct_Wifi_retry);
+                WiFi.disconnect(true); //Disable STA
+                vTaskDelay(3000/ portTICK_PERIOD_MS );  
+                WiFi.begin(WIFI_SSID, WIFI_PASSWORD); //Enable STA
+                vTaskDelay(1000/ portTICK_PERIOD_MS );  
+                
+              }
+              else
+              {                       
+                ct_Wifi_retry=0;
+                wifi_connected=1;
+                Serial.println("Wifi Reestabelecido !!");
+                wifictl_set_event( WIFICTL_CONNECT | WIFICTL_ACTIVE );
+                vTaskSuspend( _wifi_restabilsh_Task);
+              }
+
+        vTaskDelay(1000/ portTICK_PERIOD_MS ); 
+      }     
+}
+
+
+
 
 bool wifictl_powermgm_event_cb( EventBits_t event, void *arg ) {
   bool retval = false;
@@ -205,25 +274,88 @@ bool wifictl_powermgm_event_cb( EventBits_t event, void *arg ) {
     return( retval );
   }
   
-  switch( event ) {
-      case POWERMGM_STANDBY:          if ( !wifictl_config.enable_on_standby || wifictl_get_event( WIFICTL_OFF ) ) {
-                                        wifictl_standby();
-                                        retval = true;
-                                      }
-                                      else {
-                                        log_w("standby blocked by \"enable on standby\" option");
-                                        retval = false;
-                                      }
-                                      break;
-      case POWERMGM_WAKEUP:           wifictl_wakeup();
-                                      retval = true;
-                                      break;
-      case POWERMGM_SILENCE_WAKEUP:   wifictl_wakeup();
-                                      retval = true;
-                                      break;
-  }
+      log_i("POWERMGM_WIFI");
+    switch(event) {
+      
+        case POWERMGM_STANDBY:          
+              //if ((!wifictl_config.enable_on_standby) || (wifictl_get_event( WIFICTL_OFF ))||(ct_Wifi_retry>WIFI_TENTATIVES_TO_RECONNECT))
+              log_i("POWERMGM_STANDBY");
+              if(ct_Wifi_retry>WIFI_TENTATIVES_TO_RECONNECT)
+              {            
+                log_i("NO_WIFI_GOTO_POWERMGM_STANDBY");
+                wifi_connected=-1;
+                wifictl_standby();
+                
+              }
+              else {
+                log_w("standby blocked by \"enable on standby\" option");
+                retval = false;
+                vTaskResume(_wifi_restabilsh_Task);
+              }
+                
+             break;
+
+        case POWERMGM_WAKEUP:
+             
+              wifictl_wakeup();
+              ct_Wifi_retry=0;
+              vTaskResume(_wifi_restabilsh_Task);
+
+              log_i("POWERMGM_WAKEUP");
+              break;
+
+        case POWERMGM_SILENCE_WAKEUP:
+              
+              ct_Wifi_retry= WIFI_TENTATIVES_TO_RECONNECT-5; // Avaliar a necessidade de reteste no restabelecimento de conxeão
+              vTaskResume(_wifi_restabilsh_Task); 
+              wifictl_wakeup();
+
+              log_i("POWERMGM_SILENCE_WAKEUP");
+              break;
+        default:
+              log_i("Unknown event ");
+        break;
+    }
   return( retval );
 }
+
+bool wifictl_powermgm_loop_event_cb( EventBits_t event, void *arg )
+{
+   
+    switch(event) {
+          case POWERMGM_STANDBY:
+
+              if(ct_Wifi_retry>WIFI_TENTATIVES_TO_RECONNECT)
+              {            
+                  // Ajuda no quesito Desligar o SCAN do wifi imediatamente após estourar o número de tentativas
+                  vTaskSuspend(_wifi_restabilsh_Task);
+                  //wifictl_standby();
+                  wifi_connected=-1; // força flag do wifi (Desconectado) 
+              }          
+
+          break;
+
+          case POWERMGM_WAKEUP:
+                
+
+          break;
+
+          case POWERMGM_SILENCE_WAKEUP:
+                  
+
+          break;
+        }
+}
+
+
+
+
+
+
+
+
+
+
 
 void wifictl_save_config( void ) {
    wifictl_config.save();

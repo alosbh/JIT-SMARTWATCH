@@ -23,12 +23,15 @@
     #define _PMUCONFIG_H
 
     #include "utils/basejsonconfig.h"
+    #include "config.h"
 
     #define PMU_JSON_CONFIG_FILE            "/pmu.json"         /** @brief defines json config file name */
 
 	/**
      * Some default values, used below as well as in pmu.cpp during json reads
      */
+
+
     #define SILENCEWAKEINTERVAL             45                  /** @brief defines the silence wakeup interval in minutes */
 	#define SILENCEWAKEINTERVAL_PLUG		3                   /** @brief defines the silence wakeup interval in minutes when plugged*/
     #define NORMALVOLTAGE                   3300                /** @brief defines the norminal voltages while working */
@@ -42,7 +45,12 @@
         public:
         pmu_config_t();
         int32_t designed_battery_cap = 300;
+
+#ifdef      JABIL_SILENCE_WAKEUP_INTERVAL
+        int32_t silence_wakeup_interval = JABIL_SILENCE_WAKEUP_INTERVAL;
+#else
         int32_t silence_wakeup_interval = SILENCEWAKEINTERVAL;
+#endif
         int32_t silence_wakeup_interval_vbplug = SILENCEWAKEINTERVAL_PLUG;
         int32_t normal_voltage = NORMALVOLTAGE;
         int32_t normal_power_save_voltage = NORMALPOWERSAVEVOLTAGE;

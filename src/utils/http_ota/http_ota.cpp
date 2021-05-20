@@ -48,20 +48,20 @@ bool http_ota_start( const char* url, const char* md5, int32_t firmwaresize ) {
      * disable ble and set esp32 voltage to 3.3V to
      * prevent some issues
      */
-    blectl_off();
+    //blectl_off();
     pmu_set_safe_voltage_for_update();
     /*
      * if firmware an .gz file, take compressed ota otherwise
      * take a normal uncompressed firmware
      */
-    if ( strstr( url, ".gz") ) {
-        http_ota_send_event_cb( HTTP_OTA_START, (void*)"get compressed firmware ..." );
-        retval = http_ota_start_compressed( url, md5, firmwaresize );
-    }
-    else {
+   // if ( strstr( url, ".gz") ) {
+    //    http_ota_send_event_cb( HTTP_OTA_START, (void*)"get compressed firmware ..." );
+    ///    retval = http_ota_start_compressed( url, md5, firmwaresize );
+   // }
+   // else {
         http_ota_send_event_cb( HTTP_OTA_START, (void*)"get uncompressed firmware ..." );
         retval = http_ota_start_uncompressed( url, md5 );
-    }
+  //  }
     return( retval );
 }
 
@@ -149,7 +149,12 @@ bool http_ota_start_uncompressed( const char* url, const char* md5 ) {
     http.setUserAgent( "ESP32-UPDATE-" __FIRMWARE__ );
     /**
      * setup http or https
+     * 
+     * 
      */
+
+    log_i("endereço de atualizacao %s", url);
+    
     if( strstr( url, "http://" ) ) {
         /**
          * start get firmware file

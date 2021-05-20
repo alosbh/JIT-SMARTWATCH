@@ -30,18 +30,29 @@
 #include "hardware/hardware.h"
 #include "hardware/powermgm.h"
 
-#include "app/weather/weather.h"
-#include "app/stopwatch/stopwatch_app.h"
-#include "app/alarm_clock/alarm_clock.h"
-#include "app/sailing/sailing.h"
-#include "app/osmand/osmand_app.h"
-#include "app/IRController/IRController.h"
-#include "app/fx_rates/fx_rates.h"
+//#include "app/weather/weather.h"
+//#include "app/stopwatch/stopwatch_app.h"
+//#include "app/alarm_clock/alarm_clock.h"
+//#include "app/sailing/sailing.h"
+//#include "app/osmand/osmand_app.h"
+//#include "app/IRController/IRController.h"
+//#include "app/fx_rates/fx_rates.h"
 #include "app/activity/activity.h"
-#include "app/powermeter/powermeter_app.h"
-#include "app/FindPhone/FindPhone.h"
-#include "app/gps_status/gps_status.h"
+#include "app/dashboard/dashboard.h"
+//#include "app/powermeter/powermeter_app.h"
+//#include "app/FindPhone/FindPhone.h"
+//#include "app/gps_status/gps_status.h"
 #include "app/osmmap/osmmap_app.h"
+
+
+#include "utils/jit_sync/jit_pairing.h"
+
+
+
+
+int boot_finish=0;
+
+#include "app/jitsupport/jitsupport_app.h"
 
 void setup() {
     /**
@@ -65,24 +76,42 @@ void setup() {
      * inlude your header file
      * and call your app setup
      */
-    osmmap_app_setup();
-    weather_app_setup();
-    stopwatch_app_setup();
-    alarm_clock_setup();
+
+
+    /*************************************************************
+       INITIALIZE APPLICATIONS    
+        1- Jabil IT Support APP
+
+     **************************************************************/
+
+    jitsupport_app_setup();
+    dashboard_app_setup();
+
+    //osmmap_app_setup();
+    //weather_app_setup();
+    //stopwatch_app_setup();
+    //alarm_clock_setup();
     activity_app_setup();
-    gps_status_setup();
-    sailing_setup();
-    osmand_app_setup();
-    IRController_setup();
-    fxrates_app_setup();
-    powermeter_app_setup();
-	FindPhone_setup();
+    //gps_status_setup();
+    //sailing_setup();
+    //osmand_app_setup();
+    //IRController_setup();
+    //fxrates_app_setup();
+    //powermeter_app_setup();
+	//FindPhone_setup();
     /**
      * post hardware setup
      * 
      * /hardware/hardware.cpp
      */
     hardware_post_setup();
+
+    boot_finish=1;
+
+    jit_pairing_tile_setup();
+
+
+
 }
 
 void loop() {
