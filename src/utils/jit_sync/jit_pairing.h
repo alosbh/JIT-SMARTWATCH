@@ -24,6 +24,17 @@
 
     #include <TTGO.h>
 
+
+    #define   LOGIN_CLEAN           0
+    #define   LOGIN_SCREEN          1
+    #define   LOGIN_IN_PROCESS      2
+    #define   CHECK_FOR_LOGOUT      3
+
+
+
+
+
+
     void jit_pairing_tile_setup( void );
 
 #endif // _JIT_PAIRING_H

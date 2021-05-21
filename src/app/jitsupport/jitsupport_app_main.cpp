@@ -943,7 +943,7 @@ uint8_t Insere_ticket2 (Ticket_t *myticket)
         }
       
     }
-log_i("NUMERO MAIXIMO DE TICKETS ATINGIDO !!!");
+log_i("NUMERO MAXIMO DE TICKETS ATINGIDO !!!");
 return 0; 
 
 }
@@ -1137,6 +1137,7 @@ void getWatchUser(){
         http.end();
 
           }
+
 }
 
 
