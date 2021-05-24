@@ -24,10 +24,9 @@
 
 #define MQTT_CONNECTED_FLAG                                  _BV(0)         /** @brief event mask for mqtt connected */
 #define MQTT_DISCONNECTED_FLAG                               _BV(1)         /** @brief event mask for mqtt disconnected */
-#define MQTT_START_CONNECTION                                _BV(2)         /** @brief event mask for mqtt disconnected */
-
+#define MQTT_START_CONNECTION                                _BV(2)         /** @brief event mask for mqtt Start Connection */
 #define MQTT_PUBLISH_PAYLOAD_SIZE                             200
-
+#define MQTT_PUBLISH_QUEUE_SIZE                                5
 
 void mqttctrl_setup(); 
 bool mqqtctrl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
@@ -35,6 +34,11 @@ void MQTT2_publish(char atualizartopico, char payload);
 void MQTT2_set_subscribe_topics(char *topico_receber, char * topico_atualizar, char * topico_area);
 void mqqtctrl_set_event( EventBits_t bits );
 void MQTT2_set_client(char *ip_adrress);
+
+
+
+
+
 
 
 #endif // _JITSUPPORT_APP_MAIN_H

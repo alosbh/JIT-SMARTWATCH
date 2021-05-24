@@ -47,6 +47,10 @@
 #include "hardware/wifictl.h"     
 #include "jitsupport_mqtt.h"
 
+
+#include "utils/jit_sync/jit_pairing.h"
+
+
 #define USE_SERIAL Serial
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -91,6 +95,9 @@ uint8_t get_number_tickets();
 void printCard3(uint8_t index, uint8_t vibration_intensity);
 static void removefromArray(lv_obj_t *obj, lv_event_t event);
 void getWatchUser();
+void getWatchUserByUserID();
+
+
 void sendRequest(lv_obj_t *obj, lv_event_t event);
 static void toggle_Cards_Off();
 static void toggle_Cards_On();
@@ -103,6 +110,7 @@ void sendCanceled(lv_obj_t *obj, lv_event_t event);
 void show_watch_status(lv_obj_t *obj, lv_event_t event);
 void Get_TeamMembers(void * pvParameters);
 void show_team_status(lv_obj_t *obj, lv_event_t event);
+
 //------Prototipos--WIFI------
 
 bool jit_wifictl_event_cb( EventBits_t event, void *arg );
@@ -112,6 +120,11 @@ bool jit_wifictl_event_cb( EventBits_t event, void *arg );
 
 void MQTT_callback(char* topic, byte* message, unsigned int length);
 bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg );
+
+
+//----Prototipo---Login-----
+
+bool login_jit_support_cb(EventBits_t event, void *arg );
 
 
 //---------------MQTT---------------------
@@ -132,24 +145,25 @@ char payload[200];
 char nomepeq[10]= "a";
 char nomefull[100];
 
-EventGroupHandle_t xMqttEvent=NULL;
-portMUX_TYPE DRAM_ATTR mqttMux = portMUX_INITIALIZER_UNLOCKED;
-TaskHandle_t _Get_User_Task,_Get_TeamMembers_Task=NULL;
+
+TaskHandle_t _Get_User_Task,_Get_TeamMembers_Task,_Get_UserBy_UserID_Task=NULL;
 callback_t *mqtt_callback = NULL;
 
 void Get_User(void * pvParameters);
-void Get_User(void * pvParameters);
-bool mqtt_send_event_cb( EventBits_t event, void *arg);
-
+ void Get_UserByUserID(void * pvParameters);
 
 
 //----------------API----------------------
 
-char* GetWatchById_host = "http://172.24.72.137/JITAPI/Smartwatch/GetByIP/";
+char* GetWatchById_host =     "http://172.24.72.137/JITAPI/Smartwatch/GetByIP/";
+char* GetWatchByUserID_host = "http://172.24.72.137/JITAPI/Smartwatch/GetByUserId/";
+
+
 char GetWatchById_Url[50] = {0};
 char ip_address[15];
 
 String meuip;
+int Userid=0;
 HTTPClient http;
 StaticJsonDocument<200> result;
 StaticJsonDocument<200> userjson;
@@ -537,10 +551,8 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     client.setServer(mqtt_server, MQTT_PORT);
     client.setKeepAlive(MQTT_KEEPALIVE_SECONDS);
     client.setCallback(MQTT_callback);
-
-    xMqttEvent=xEventGroupCreate(); 
-   
-  //---- Task para GET POST USER
+  
+    //---- Task para GET  USER
      xTaskCreatePinnedToCore( Get_User,                                 /* Function to implement the task */
                              "Get User",                                /* Name of the task */
                               3000,                                     /* Stack size in words */
@@ -553,7 +565,75 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
    mqqtctrl_register_cb(MQTT_DISCONNECTED_FLAG | MQTT_CONNECTED_FLAG, jitsupport_mqttctrl_event_cb,  "jitsupport Mqtt CB " );
    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, jitsupport_powermgm_loop_cb, "jitsupport app loop" );
    wifictl_register_cb( WIFICTL_CONNECT | WIFICTL_DISCONNECT | WIFICTL_OFF | WIFICTL_ON | WIFICTL_SCAN | WIFICTL_WPS_SUCCESS | WIFICTL_WPS_FAILED | WIFICTL_CONNECT_IP, jit_wifictl_event_cb, "JIT Wifi Event" );
+   loginctrl_register_cb( LOGIN_DONE | LOGOUT_REQUEST | LOGOUT_DONE, login_jit_support_cb,"Login Jit Support");
+
+
 }
+
+
+bool login_jit_support_cb(EventBits_t event, void *arg ){
+
+    switch(event) {
+        case LOGIN_DONE:
+
+         log_i("TEste de UserID %d",  arg); 
+  
+          Userid=(int)arg;
+          pegueiUser=false;
+                  //---- Task para GET  USER
+          xTaskCreatePinnedToCore( Get_UserByUserID,                                 /* Function to implement the task */
+                                  "Get User",                                        /* Name of the task     */
+                                  3000,                                              /* Task input parameter */
+                                  0,                                                 /* Stack size in words  */
+                                  NULL,                                              /* Priority of the task */
+                                  &_Get_UserBy_UserID_Task,                          /* Task handle.         */
+                                  0 );
+
+
+  
+  
+        break;
+
+    }
+
+return true;
+}
+
+void Get_UserByUserID(void * pvParameters)
+{
+
+  log_i("Inicialização de Procura do User");
+  while(1)
+  {           
+          if(wifictl_get_event( WIFICTL_CONNECT ))
+          {
+            if(!pegueiUser)getWatchUserByUserID();
+            else
+            {             
+
+                MQTT2_set_client(ip_address);
+                MQTT2_set_subscribe_topics(nometopico,atualizartopico,areatopico);
+                
+                log_i("setando evento de conexão mqtt");
+                vTaskDelay(1000/ portTICK_PERIOD_MS );
+                mqqtctrl_set_event(MQTT_START_CONNECTION);
+
+                xTaskCreatePinnedToCore( Get_TeamMembers,                               /* Function to implement the task */
+                                              "Get User",                               /* Name of the task */
+                                              5000,                                     /* Stack size in words */
+                                                NULL,                                   /* Task input parameter */
+                                                0,                                      /* Priority of the task */
+                                                &_Get_TeamMembers_Task,                 /* Task handle. */
+                                                0 );   
+                vTaskDelete(NULL);  
+            }            
+          }
+          else log_i("Não ta rolando WIFI");     
+      vTaskDelay(2000/ portTICK_PERIOD_MS );
+  }
+
+}
+
 
 
 void Get_TeamMembers(void * pvParameters)
@@ -668,9 +748,9 @@ void Get_User(void * pvParameters)
                 vTaskDelay(1000/ portTICK_PERIOD_MS );
                 mqqtctrl_set_event(MQTT_START_CONNECTION);
 
-                xTaskCreatePinnedToCore( Get_TeamMembers,                        /* Function to implement the task */
-                                              "Get User",                              /* Name of the task */
-                                              5000,                                   /* Stack size in words */
+                xTaskCreatePinnedToCore( Get_TeamMembers,                               /* Function to implement the task */
+                                              "Get User",                               /* Name of the task */
+                                              5000,                                     /* Stack size in words */
                                                 NULL,                                   /* Task input parameter */
                                                 0,                                      /* Priority of the task */
                                                 &_Get_TeamMembers_Task,                 /* Task handle. */
@@ -708,6 +788,7 @@ bool jit_wifictl_event_cb( EventBits_t event, void *arg ) {
 
 
 static void exit_jitsupport_app_main_event_cb( lv_obj_t * obj, lv_event_t event ) {
+    
     switch( event ) {
         case( LV_EVENT_CLICKED ):       mainbar_jump_to_maintile( LV_ANIM_OFF );
                                         break;
@@ -741,8 +822,7 @@ return( true );
 //-------------------------MQTT FUNCTIONS------------------------
 
 
-bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg )
-{
+bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg ){
 
     switch(event) {
         case MQTT_DISCONNECTED_FLAG:  
@@ -756,7 +836,6 @@ bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg )
             lv_label_set_text(lbl_MQTT, "MQTT_CONNECTED");  
 
             break;
-
         }
 
 return( true );
@@ -1040,6 +1119,7 @@ void getWatchUser(){
 
     meuip = WiFi.localIP().toString();
     meuip.toCharArray(ip_address,15);
+    
 
     log_i("MEU IP É O SEGUINTE: %s",ip_address);
     lv_label_set_text(lbl_IP,ip_address);
@@ -1139,6 +1219,130 @@ void getWatchUser(){
           }
 
 }
+
+
+void getWatchUserByUserID(){
+
+    meuip = WiFi.localIP().toString();
+    meuip.toCharArray(ip_address,15);
+
+
+
+    String userid= String(Userid);
+    char user_id[8];
+    userid.toCharArray(user_id,8);
+
+    log_i("MEU IP É O SEGUINTE: %s",ip_address);
+    lv_label_set_text(lbl_IP,ip_address);
+
+    strcpy(GetWatchById_Url,"");
+    strcat(GetWatchById_Url, GetWatchByUserID_host);
+    strcat(GetWatchById_Url, user_id);
+    
+    log_i("ENDEREÇO DE API:");
+    log_i("%s",GetWatchById_Url); 
+
+  
+        
+        http.begin(GetWatchById_Url); //HTTP
+        httpCode = http.GET();
+        log_i("%d",httpCode);
+        
+        if(httpCode > 0) {
+
+          
+            if(httpCode == HTTP_CODE_OK) {
+                
+                String payload = http.getString();
+                deserializeJson(result, payload);
+
+                idTeam = result["teamId"];
+                log_i("ID do time getwatch:");
+                log_i("%d",idTeam);
+                           
+                String numerotopico = String(idTeam);       
+                
+                NomeTopicoReceber = "receber/" + numerotopico;
+                NomeTopicoAtualizar = "atualizar/" + numerotopico;
+                
+                log_i("Nome Topico Receber:");
+                log_i("%s",NomeTopicoReceber);
+                log_i("Nome Topico Atualizar:");            
+                log_i("%s",NomeTopicoAtualizar);
+                
+                NomeTopicoReceber.toCharArray(nometopico,15);
+                NomeTopicoAtualizar.toCharArray(atualizartopico,15);
+
+                auto user = result["user"].as<const char*>();
+                auto area = result["area"].as<const char*>();
+                log_i("%s",user);
+
+                StaticJsonDocument<256> userObj;
+                StaticJsonDocument<256> areaObj;
+                deserializeJson(userObj, user);
+                deserializeJson(areaObj, area);
+
+                auto id = userObj[0]["id"].as<int>();
+                auto text = userObj[0]["text"].as<const char*>();
+                auto my_local = areaObj[0]["text"].as<const char*>();
+
+                strcpy(nomefull,text);
+
+                log_i("%d",id);
+                log_i("%s",text);
+                log_i("%s",my_local);
+
+                lv_label_set_text(lbl_UserName,text);
+                lv_label_set_text(lbl_Area, my_local);
+
+                NomeTopicoArea = "general/" + String(my_local);  
+                NomeTopicoArea.toCharArray(areatopico,30);
+                pegueiUser = true;
+
+                
+              } else {
+                  log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+                  pegueiUser = false;
+              }
+
+        http.end();
+
+          }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void printCard3(uint8_t index, uint8_t vibration_intensity){

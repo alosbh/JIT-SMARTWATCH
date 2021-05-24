@@ -63,7 +63,6 @@ void Mqtt_Ctrl_task( void * pvParameters );
 void Mqtt_Publish_task( void * pvParameters );
 
 callback_t *mqttctrl_callback = NULL;
-//portMUX_TYPE DRAM_ATTR mqttcrlMux = portMUX_INITIALIZER_UNLOCKED;
 
 
 //***************PROTOTIPOS*****************//
@@ -93,7 +92,7 @@ void mqttctrl_setup()
     client2.setKeepAlive(120);
     client2.setCallback(MQTT2_callback);
     
-    xMQTT_Publish_Queue = xQueueCreate(5,int(MQTT_PUBLISH_PAYLOAD_SIZE));
+    xMQTT_Publish_Queue = xQueueCreate(MQTT_PUBLISH_QUEUE_SIZE,int(MQTT_PUBLISH_PAYLOAD_SIZE));
     if(xMQTT_Publish_Queue){
       log_e("Error to create MQTT_Publish_Queue");
     }

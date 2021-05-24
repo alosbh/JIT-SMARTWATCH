@@ -23,7 +23,7 @@
     #define _JIT_PAIRING_H
 
     #include <TTGO.h>
-
+    #include "hardware/callback.h"
 
     #define   LOGIN_CLEAN           0
     #define   LOGIN_SCREEN          1
@@ -31,10 +31,17 @@
     #define   CHECK_FOR_LOGOUT      3
 
 
+// ---------EVENT GROUP----------- 
 
-
+#define LOGIN_DONE                                           _BV(0)         /** @brief event mask for LOGIN_REALIZADO */
+#define LOGOUT_REQUEST                                      _BV(1)         /** @brief event mask for LOGOUT_REQUEST */
+#define LOGOUT_DONE                                   _BV(2)         /** @brief event mask for mqtt LOGOUT_REALIZADO */
 
 
     void jit_pairing_tile_setup( void );
 
+    bool loginctrl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
+
 #endif // _JIT_PAIRING_H
+
+

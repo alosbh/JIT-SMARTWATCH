@@ -33,7 +33,8 @@
 #include "hardware/powermgm.h"
 #include "hardware/motor.h" 
 #include "gui/keyboard.h"
-#include "hardware/wifictl.h"     
+#include "hardware/wifictl.h" 
+#include "hardware/callback.h"
 
 #include "hardware/powermgm.h"
 
@@ -62,15 +63,26 @@ static void jabil_pairing_num_textarea_event_cb( lv_obj_t * obj, lv_event_t even
 static void exit_jit_pairing_event_cb( lv_obj_t * obj, lv_event_t event );
 bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ); 
 static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event);
-bool jit_pairing_event_cb();
+bool jit_pairing_login_screen();
 
 bool start_login_flag=false;
 uint8_t login_state=LOGIN_CLEAN;
 uint32_t jit_pairing_tile_num;
 char token[10];
+int UserID;
 
 void login_task(void * pvParameters);
 bool check_token();
+
+EventGroupHandle_t xLoginCtrlEvent=NULL;
+callback_t *loginctrl_callback = NULL;
+
+//--------- Prototipos------------
+
+void loginctrl_set_event( EventBits_t bits );
+void loginctrl_clear_event( EventBits_t bits);
+bool loginctrl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ); 
+bool loginctrl_send_event_cb( EventBits_t event, void *arg );
 
 
 
@@ -107,7 +119,7 @@ void jit_pairing_tile_setup( void ) {
     lv_obj_align( jit_pairing_code_cont, jit_pairing_info_label, LV_ALIGN_OUT_BOTTOM_MID, -40, 35 );
   
     jit_pairing_code_textfield = lv_textarea_create( jit_pairing_code_cont, NULL);
-    lv_textarea_set_text( jit_pairing_code_textfield, " " );
+    lv_textarea_set_text( jit_pairing_code_textfield, "" );
     lv_textarea_set_pwd_mode( jit_pairing_code_textfield, true);
     lv_textarea_set_accepted_chars( jit_pairing_code_textfield, "-.0123456789.");
     lv_textarea_set_one_line( jit_pairing_code_textfield, true);
@@ -127,13 +139,16 @@ void jit_pairing_tile_setup( void ) {
     lv_label_set_text( login_btn_label, "LOGIN");
 
     lv_obj_set_event_cb( jit_pairing_code_textfield, jabil_pairing_num_textarea_event_cb );
-    //blectl_register_cb( BLECTL_PIN_AUTH | BLECTL_PAIRING_SUCCESS | BLECTL_PAIRING_ABORT, jit_pairing_event_cb, "jit pairing" );
+
+    xLoginCtrlEvent=xEventGroupCreate();
+    loginctrl_clear_event(LOGIN_DONE|LOGOUT_REQUEST|LOGOUT_DONE); 
+
     powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, jit_pairing_powermgm_loop_cb, "jitsupport app loop" );
-    jit_pairing_event_cb();
+    jit_pairing_login_screen();
 
 }
 
-bool jit_pairing_event_cb() {
+bool jit_pairing_login_screen() {
     
     statusbar_hide( true );
     powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
@@ -156,8 +171,8 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
 
            case(LOGIN_CLEAN):
 
-            lv_textarea_set_text( jit_pairing_code_textfield," ");
-            lv_label_set_text( jit_pairing_status_label, " " );
+            lv_textarea_set_text( jit_pairing_code_textfield,"");
+            lv_label_set_text( jit_pairing_status_label, "" );
             login_state=LOGIN_SCREEN;
 
            break;
@@ -167,7 +182,7 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
             if(pmu_is_vbus_plug() || (start_login_flag==true))
             {
                 start_login_flag=true;
-                jit_pairing_event_cb();
+                jit_pairing_login_screen();
             }
             else
             {
@@ -189,7 +204,7 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
 
                 if(pmu_is_vbus_plug())
                 {
-                    //jit_pairing_event_cb();
+                    //jit_pairing_login_screen();
                     login_state=LOGIN_CLEAN;
                 }
 
@@ -211,7 +226,7 @@ static void jabil_pairing_num_textarea_event_cb ( lv_obj_t * obj, lv_event_t eve
     if( event == LV_EVENT_CLICKED ) {
 
         char token[10];
-        num_keyboard_set_textarea( obj );
+        num_keyboard_set_textarea(obj);
 
 
         if(strcmp(token,"123456")==0)
@@ -239,10 +254,10 @@ static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event){
         strlcpy( token, lv_textarea_get_text( jit_pairing_code_textfield), sizeof(token) );
         log_i("Peguei o token: %s",token);
 
-    //---- Task para Reestabelecimento da Conexão MQTT
+        //---- Task para Reestabelecimento da Conexão MQTT
         xTaskCreatePinnedToCore( login_task,                               /* Function to implement the task */
                                 "login_Task",                                 /* Name of the task */
-                                2000,                                         /* Stack size in words */
+                                5000,                                         /* Stack size in words */
                                 NULL,                                         /* Task input parameter */
                                 2,                                            /* Priority of the task */
                                 &_login_task,                              /* Task handle. */
@@ -263,9 +278,14 @@ void login_task(void * pvParameters)
       lv_label_set_text( jit_pairing_status_label, "CHECKING TOKEN...");
 
       vTaskDelay(1000/ portTICK_PERIOD_MS );
+      
       if(check_token())
       {
         // LOGIN SUCCESS 
+       
+        loginctrl_set_event(LOGIN_DONE);
+        loginctrl_send_event_cb( LOGIN_DONE, (int *)UserID );
+
         lv_label_set_text( jit_pairing_status_label, "OK READY TO GO... WELCOME !");          
         vTaskDelay(1000/ portTICK_PERIOD_MS );
         start_login_flag=false;
@@ -283,8 +303,7 @@ bool check_token(){
         
     if(wifictl_get_event( WIFICTL_CONNECT ))
     {
-        
-        
+            
         HTTPClient http;
         char post[100];
         http.begin(LOGIN_API_URL);
@@ -293,20 +312,47 @@ bool check_token(){
         //---------- Create JSON POST-----------
         StaticJsonDocument<200> doc;
         doc["token"] = token;
+        doc["mac"] = "BRBELME024";
     
         String postBody;
         serializeJson(doc, postBody);
         postBody.toCharArray(post,sizeof(post));
         //--------------------------------------
 
-
+        log_i("HTTP POSTing... ");
         int httpResponseCode = http.POST(postBody);
 
-        if(httpResponseCode > 0) {
+        log_i("HTTP POSTing response.. ");
      
-            if(httpResponseCode == HTTP_CODE_OK) {
+            if((httpResponseCode > 0) && (httpResponseCode == HTTP_CODE_OK)) {
                               
-               // String payload = http.getString();
+                String payload = http.getString();
+                
+                //--------- READING RESPONSE-------
+                
+                StaticJsonDocument<400> doc;
+                DeserializationError error = deserializeJson(doc, payload);
+
+
+                if(error)
+                {
+                    log_i("Error deserializeJson during Login: %s", error.f_str()); 
+                    lv_label_set_text( jit_pairing_status_label, "Login Error !");
+                    return false;
+                }
+
+                
+                const char* Status = doc["Status"];
+                bool Success = doc["Success"];
+                UserID = doc["UserId"]; 
+
+                lv_label_set_text( jit_pairing_status_label, Status);
+                
+                log_i("User id pego: %d", UserID);
+                //Return true case LOGIN OK 
+                http.end();
+                return Success; 
+             
               } 
               else {
                   //log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
@@ -314,9 +360,6 @@ bool check_token(){
                   http.end();
                   return false;
               }
-
-        
-          }
     }
     else
     {
@@ -329,4 +372,37 @@ bool check_token(){
 return true;
           
 }
+
+
+void loginctrl_set_event( EventBits_t bits ){
+    xEventGroupSetBits( xLoginCtrlEvent, bits);
+}
+
+void loginctrl_clear_event( EventBits_t bits){
+    xEventGroupClearBits( xLoginCtrlEvent, bits);
+}
+
+EventBits_t loginctrl_get_event( EventBits_t bits){
+
+    EventBits_t temp = xEventGroupGetBits( xLoginCtrlEvent ) & bits;
+
+    return( temp );
+}
+
+
+bool loginctrl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ) {
+    if ( loginctrl_callback == NULL ) {
+        loginctrl_callback = callback_init( "LoginCtrl");
+        if ( loginctrl_callback == NULL ) {
+            log_e("LoginCtrl Callback alloc failed");
+            while(true);
+        }
+    }    
+    return(callback_register( loginctrl_callback, event, callback_func, id ));
+}
+
+bool loginctrl_send_event_cb( EventBits_t event, void *arg ) {
+    return( callback_send( loginctrl_callback, event, arg ) );
+}
+
 
