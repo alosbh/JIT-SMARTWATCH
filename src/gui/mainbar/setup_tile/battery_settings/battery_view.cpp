@@ -78,7 +78,7 @@ void battery_view_tile_setup( uint32_t tile_num ) {
     lv_obj_align( battery_design_cap_label, battery_design_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
     battery_view_design_cap = lv_label_create( battery_design_cont, NULL);
     lv_obj_add_style( battery_view_design_cap, LV_OBJ_PART_MAIN, &battery_view_style  );
-    lv_label_set_text( battery_view_design_cap, "300mAh");
+    lv_label_set_text( battery_view_design_cap, "760mAh");
     lv_obj_align( battery_view_design_cap, battery_design_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
 
     lv_obj_t *battery_current_cont = lv_obj_create( battery_view_tile, NULL );
@@ -91,7 +91,7 @@ void battery_view_tile_setup( uint32_t tile_num ) {
     lv_obj_align( battery_current_cap_label, battery_current_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
     battery_view_current_cap = lv_label_create( battery_current_cont, NULL);
     lv_obj_add_style( battery_view_current_cap, LV_OBJ_PART_MAIN, &battery_view_style  );
-    lv_label_set_text( battery_view_current_cap, "300mAh");
+    lv_label_set_text( battery_view_current_cap, "760mAh");
     lv_obj_align( battery_view_current_cap, battery_current_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
 
     lv_obj_t *battery_voltage_cont = lv_obj_create( battery_view_tile, NULL );

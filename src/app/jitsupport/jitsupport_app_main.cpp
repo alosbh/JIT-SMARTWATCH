@@ -234,6 +234,10 @@ static lv_obj_t * btn_config;
 static lv_obj_t *btn_status;
 static lv_obj_t *btn_team;
 
+static lv_obj_t * lbl_Teamstatus[10];
+static lv_obj_t * lbl_team;
+
+
 //----------------------------------------------------------------------------
 static void exit_jitsupport_app_main_event_cb( lv_obj_t * obj, lv_event_t event );
 
@@ -541,6 +545,19 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     lv_obj_set_event_cb(btn_team, show_team_status);
 
 
+    lbl_team = lv_label_create(team_card, NULL);
+    lv_label_set_text(lbl_team, "TEAM MEMBERS: ");
+    lv_obj_align(lbl_team, NULL, LV_ALIGN_IN_TOP_LEFT, 10, 5);
+
+    for( int a=0 ; a < 10;  a++)
+    {
+          lbl_Teamstatus[a] = lv_label_create(team_card, NULL);
+          lv_label_set_text(lbl_Teamstatus[a],"");
+
+    }
+
+
+
     // INIT CARD
 
     lv_obj_set_hidden(status_card,true);
@@ -697,19 +714,9 @@ void Get_TeamMembers(void * pvParameters)
                       }
                       else{
                         
-                          //Melhorar implementação 
-
-                          lv_obj_t * lbl_Teamstatus[num-1];
-                          lv_obj_t * lbl_team;
-
-                          lbl_team = lv_label_create(team_card, NULL);
-                          lv_label_set_text(lbl_team, "TEAM MEMBERS: ");
-                          lv_obj_align(lbl_team, NULL, LV_ALIGN_IN_TOP_LEFT, 10, 5);
-
-
                           for( int a=0 ; a < num;  a++)
                           {
-                                lbl_Teamstatus[a] = lv_label_create(team_card, NULL);
+                                //lbl_Teamstatus[a] = lv_label_create(team_card, NULL);
                                 lv_label_set_text(lbl_Teamstatus[a], Team_Members[a].Member_Name);
                                 lv_obj_align(lbl_Teamstatus[a], NULL, LV_ALIGN_IN_TOP_LEFT, 10, 30 + 13*a);
                           }
@@ -1310,37 +1317,6 @@ void getWatchUserByUserID(){
           }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

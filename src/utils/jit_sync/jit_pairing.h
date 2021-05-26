@@ -33,9 +33,9 @@
 
 // ---------EVENT GROUP----------- 
 
-#define LOGIN_DONE                                           _BV(0)         /** @brief event mask for LOGIN_REALIZADO */
-#define LOGOUT_REQUEST                                      _BV(1)         /** @brief event mask for LOGOUT_REQUEST */
-#define LOGOUT_DONE                                   _BV(2)         /** @brief event mask for mqtt LOGOUT_REALIZADO */
+#define LOGIN_DONE                                            _BV(0)         /** @brief event mask for LOGIN_REALIZADO */
+#define LOGOUT_REQUEST                                        _BV(1)         /** @brief event mask for LOGOUT_REQUEST */
+#define LOGOUT_DONE                                           _BV(2)         /** @brief event mask for mqtt LOGOUT_REALIZADO */
 
 
     void jit_pairing_tile_setup( void );

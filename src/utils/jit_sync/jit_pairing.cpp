@@ -65,8 +65,8 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg );
 static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event);
 bool jit_pairing_login_screen();
 
-bool start_login_flag=false;
-uint8_t login_state=LOGIN_CLEAN;
+bool start_login_flag=true;
+uint8_t login_state=LOGIN_SCREEN;
 uint32_t jit_pairing_tile_num;
 char token[10];
 int UserID;
@@ -109,7 +109,7 @@ void jit_pairing_tile_setup( void ) {
 
     jit_pairing_status_label = lv_label_create( jit_pairing_tile, NULL);
     lv_obj_add_style( jit_pairing_status_label, LV_OBJ_PART_MAIN, &jit_pairing_style  );
-    lv_label_set_text( jit_pairing_status_label, "No Status");
+    lv_label_set_text( jit_pairing_status_label, "");
     lv_obj_align( jit_pairing_status_label, jit_pairing_tile, LV_ALIGN_IN_BOTTOM_LEFT, 2, -20);
 
 
@@ -181,7 +181,7 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
 
             if(pmu_is_vbus_plug() || (start_login_flag==true))
             {
-                start_login_flag=true;
+                //start_login_flag=true;
                 jit_pairing_login_screen();
             }
             else
@@ -232,11 +232,11 @@ static void jabil_pairing_num_textarea_event_cb ( lv_obj_t * obj, lv_event_t eve
         if(strcmp(token,"123456")==0)
         {          
             mainbar_jump_to_maintile( LV_ANIM_OFF );
+            start_login_flag=false;
+            login_state=CHECK_FOR_LOGOUT;
 
         }
-
     }
-
 }
 
 static void exit_jit_pairing_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -276,7 +276,6 @@ void login_task(void * pvParameters)
   while(1)
   {           
       lv_label_set_text( jit_pairing_status_label, "CHECKING TOKEN...");
-
       vTaskDelay(1000/ portTICK_PERIOD_MS );
       
       if(check_token())
@@ -301,7 +300,7 @@ void login_task(void * pvParameters)
 
 bool check_token(){
         
-    if(wifictl_get_event( WIFICTL_CONNECT ))
+    if(wifi_connected==1)
     {
             
         HTTPClient http;
@@ -323,21 +322,20 @@ bool check_token(){
         int httpResponseCode = http.POST(postBody);
 
         log_i("HTTP POSTing response.. ");
+
+            String payload = http.getString();
      
-            if((httpResponseCode > 0) && (httpResponseCode == HTTP_CODE_OK)) {
-                              
-                String payload = http.getString();
-                
+            if(httpResponseCode == HTTP_CODE_OK) {
+
                 //--------- READING RESPONSE-------
                 
                 StaticJsonDocument<400> doc;
                 DeserializationError error = deserializeJson(doc, payload);
 
-
                 if(error)
                 {
                     log_i("Error deserializeJson during Login: %s", error.f_str()); 
-                    lv_label_set_text( jit_pairing_status_label, "Login Error !");
+                    lv_label_set_text( jit_pairing_status_label, "Login Error: HTTP OK Json Deserialize ");
                     return false;
                 }
 
@@ -349,15 +347,30 @@ bool check_token(){
                 lv_label_set_text( jit_pairing_status_label, Status);
                 
                 log_i("User id pego: %d", UserID);
-                //Return true case LOGIN OK 
+                
+               
                 http.end();
-                return Success; 
+                return Success;  //Return true case LOGIN OK 
              
               } 
               else {
-                  //log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-                  lv_label_set_text( jit_pairing_status_label, "Login Error !");
-                  http.end();
+
+                //---------- ERROR MESSAGE ------------
+
+                StaticJsonDocument<200> doc;
+                DeserializationError error = deserializeJson(doc, payload);
+
+                if(error)
+                {
+                    log_i("Error deserializeJson during Login: %s", error.f_str()); 
+                    lv_label_set_text( jit_pairing_status_label, "Login Error: HTTP NOK Json Deserialize !");
+                    return false;
+                }
+
+                const char* Message = doc["Message"];
+                lv_label_set_text( jit_pairing_status_label, Message);
+                http.end();
+
                   return false;
               }
     }

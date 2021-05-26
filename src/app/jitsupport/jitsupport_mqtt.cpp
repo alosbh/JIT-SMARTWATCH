@@ -84,6 +84,7 @@ char receive_topic[15];
 char update_topic[15];
 char area_topic[20];  
 char ip_client[15];
+bool first_connection_flag=true;
 
 void mqttctrl_setup()
 {
@@ -153,6 +154,7 @@ void Mqtt_init_task( void * pvParameters )
     while(1)
     {     
           xBits=xEventGroupWaitBits(xMqttCtrlEvent,MQTT_START_CONNECTION, pdTRUE,pdTRUE,portMAX_DELAY);
+          first_connection_flag=true;
           vTaskResume(_mqttStatus_Task);
           vTaskDelete(NULL);
     }
@@ -190,7 +192,6 @@ void Mqtt_Publish_task( void * pvParameters )
           }
           else
           {
-
             vTaskDelay(CHECK_MQTT_CONNECTION_MILLI_SECONDS / portTICK_PERIOD_MS );
           }
     }
@@ -348,8 +349,7 @@ void Mqtt_Ctrl_task(void * pvParameters)
 {  
     EventBits_t xBits;
 
-    static bool first_connection_flag=true;
-
+  
     while(1)
     {     
           xBits=xEventGroupWaitBits(xMqttCtrlEvent,MQTT_DISCONNECTED_FLAG, pdTRUE,pdTRUE,portMAX_DELAY); 
