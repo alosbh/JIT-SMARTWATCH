@@ -71,7 +71,6 @@ void MQTT2_callback(char* topic, byte* message, unsigned int length);
 bool jit_mqtt_powermgm_loop_cb(EventBits_t event, void *arg );
 
 
-
 void mqqtctrl_set_event( EventBits_t bits );
 void mqqtctrl_clear_event( EventBits_t bits);
 EventBits_t mqqtctrl_get_event( EventBits_t bits);
@@ -85,6 +84,7 @@ char update_topic[15];
 char area_topic[20];  
 char ip_client[15];
 bool first_connection_flag=true;
+uint8_t once_flag=0;
 
 void mqttctrl_setup()
 {
@@ -104,12 +104,12 @@ void mqttctrl_setup()
 
   
    //---- Task para Monitoração da Conexão MQTT
-     xTaskCreatePinnedToCore( Mqtt_init_task,                              /* Function to implement the task */
-                             "Mqtt Init task",                             /* Name of the task */
+     xTaskCreatePinnedToCore( Mqtt_init_task,                                /* Function to implement the task */
+                             "Mqtt Init task",                               /* Name of the task */
                               2000,                                          /* Stack  Last measure 1368 */
                               NULL,                                          /* Task input parameter */
                               0,                                             /* Priority of the task */
-                              &_mqtt_init_task,                             /* Task handle. */
+                              &_mqtt_init_task,                              /* Task handle. */
                               0);
   
   //---- Task para Monitoração da Conexão MQTT
@@ -127,18 +127,18 @@ void mqttctrl_setup()
                              "Mqtt Contrl",                                 /* Name of the task */
                               2000,                                         /* Stack size in words */
                               NULL,                                         /* Task input parameter */
-                              2,                                            /* Priority of the task */
+                              1,                                            /* Priority of the task */
                               &_mqttCtrl_Task,                              /* Task handle. */
                               0);
    //vTaskSuspend(_mqttCtrl_Task);
 
 
-     xTaskCreatePinnedToCore( Mqtt_Publish_task,                               /* Function to implement the task */
+     xTaskCreatePinnedToCore( Mqtt_Publish_task,                             /* Function to implement the task */
                              "Mqtt Publish",                                 /* Name of the task */
-                              2000,                                         /* Stack size in words */
-                              NULL,                                         /* Task input parameter */
-                              1,                                            /* Priority of the task */
-                              &_mqttPublish_Task,                              /* Task handle. */
+                              2000,                                          /* Stack size in words */
+                              NULL,                                          /* Task input parameter */
+                              1,                                             /* Priority of the task */
+                              &_mqttPublish_Task,                            /* Task handle. */
                               0);
 
 
@@ -155,8 +155,12 @@ void Mqtt_init_task( void * pvParameters )
     {     
           xBits=xEventGroupWaitBits(xMqttCtrlEvent,MQTT_START_CONNECTION, pdTRUE,pdTRUE,portMAX_DELAY);
           first_connection_flag=true;
+          once_flag=0;
+
+          client2.disconnect();             // Em caso de logar outro usuário 
+
           vTaskResume(_mqttStatus_Task);
-          vTaskDelete(NULL);
+         // vTaskDelete(NULL);
     }
 }
 
@@ -240,8 +244,7 @@ return( true );
 
 void Mqtt_status_task(void * pvParameters ){
 
-  static uint8_t once_flag=0;
-  bool subscribe_flag1,subscribe_flag2=false;
+  bool subscribe_flag1,subscribe_flag2,subscribe_flag3=false;
 
     while (1) {
 
@@ -257,12 +260,15 @@ void Mqtt_status_task(void * pvParameters ){
             log_i("%s",update_topic);
             log_i("%s",area_topic);
 
-
+            if(client2.unsubscribe(receive_topic))log_i("unsubscribe receive_topic... Done");
+            if(client2.unsubscribe(update_topic)) log_i("unsubscribe update_topic... Done");
+            if(client2.unsubscribe(area_topic)) log_i("unsubscribe area_topic Done");
+                  
             subscribe_flag1=client2.subscribe(receive_topic,1);
             subscribe_flag2 =client2.subscribe(update_topic,1);
-            subscribe_flag2 =client2.subscribe(area_topic,1);
+            subscribe_flag3 =client2.subscribe(area_topic,1);
 
-            if((subscribe_flag1==true)&&(subscribe_flag2==true))
+            if((subscribe_flag1==true)&&(subscribe_flag2==true)&&(subscribe_flag3==true))
             {
                 log_i(" Success while Subscribe"); 
                 once_flag=1;
@@ -365,6 +371,7 @@ void Mqtt_Ctrl_task(void * pvParameters)
               
               // OK CONNECTED CLEAN SESSION TRUE 
               client2.disconnect();
+              log_i("MQQT Disconnecting...");  
               
               if(client2.connect(ip_client, MQTT_USER, MQTT_PSSWD,"status_team", 1, 1,"off", MQTT_CLEAN_SESSION)){
                 

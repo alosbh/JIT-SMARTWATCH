@@ -39,24 +39,21 @@
 #include "gui/sound/piep.h"
 #include "hardware/sound.h"
 #include "hardware/motor.h"
+#include "hardware/callback.h"
+#include "hardware/wifictl.h"  
 
 #include "AsyncJson.h"
 #include "ArduinoJson.h"
 #include "utils/alloc.h"
-#include "hardware/callback.h"
-#include "hardware/wifictl.h"     
+   
 #include "jitsupport_mqtt.h"
-
-
 #include "utils/jit_sync/jit_pairing.h"
 
-
-#define USE_SERIAL Serial
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <PubSubClient.h>
 
-
+#define USE_SERIAL Serial
 
 //---------- Estrutura do Ticket---------
 
@@ -84,7 +81,7 @@ typedef struct{
 
 Team_t Team_Members[10];
 
-//------Prototipos---JIT APP---
+//------Prototipos--JIT APP---
 
 Ticket_t *remove_ticket(Ticket_t *ticket_remover);
 Ticket_t *busca_ticket2 (Ticket_t *myticket);
@@ -96,44 +93,33 @@ void printCard3(uint8_t index, uint8_t vibration_intensity);
 static void removefromArray(lv_obj_t *obj, lv_event_t event);
 void getWatchUser();
 void getWatchUserByUserID();
-
-
 void sendRequest(lv_obj_t *obj, lv_event_t event);
 static void toggle_Cards_Off();
 static void toggle_Cards_On();
 static void btn2_handler(lv_obj_t *obj, lv_event_t event);
 static void btn1_handler(lv_obj_t *obj, lv_event_t event);
 Ticket_t *busca_ticket_index (uint8_t index);
-static void exit_jitsupport_app_main_event_cb( lv_obj_t * obj, lv_event_t event );
 uint8_t atualiza_ticket(Ticket_t *atualiza);
 void sendCanceled(lv_obj_t *obj, lv_event_t event);
 void show_watch_status(lv_obj_t *obj, lv_event_t event);
-void Get_TeamMembers(void * pvParameters);
 void show_team_status(lv_obj_t *obj, lv_event_t event);
+void clear_all_tickets();
 
-//------Prototipos--WIFI------
+//------Prototipos--Callback------
 
 bool jit_wifictl_event_cb( EventBits_t event, void *arg );
-
+static void exit_jitsupport_app_main_event_cb( lv_obj_t * obj, lv_event_t event );
+bool jitsupport_powermgm_loop_cb( EventBits_t event, void *arg );
+bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg );
+bool login_jit_support_cb(EventBits_t event, void *arg );
 
 //------Prototipos--MQTT----
 
 void MQTT_callback(char* topic, byte* message, unsigned int length);
-bool jitsupport_mqttctrl_event_cb(EventBits_t event, void *arg );
 
 
-//----Prototipo---Login-----
+//---------MQTT----------------
 
-bool login_jit_support_cb(EventBits_t event, void *arg );
-
-
-//---------------MQTT---------------------
-
-const char* mqtt_server = MQTT_SERVER;
-WiFiClient espClient3;
-PubSubClient client(espClient3);
-
-bool once_flag=false;
 uint8_t idTeam;
 String NomeTopicoReceber="";
 String NomeTopicoAtualizar="";
@@ -142,21 +128,21 @@ char nometopico[15];
 char atualizartopico[15];
 char areatopico[30];
 char payload[200];
-char nomepeq[10]= "a";
 char nomefull[100];
 
 
+//-------Tasks--------
+
 TaskHandle_t _Get_User_Task,_Get_TeamMembers_Task,_Get_UserBy_UserID_Task=NULL;
-callback_t *mqtt_callback = NULL;
-
 void Get_User(void * pvParameters);
- void Get_UserByUserID(void * pvParameters);
-
+void Get_UserByUserID(void * pvParameters);
+void Get_TeamMembers(void * pvParameters);
 
 //----------------API----------------------
 
-char* GetWatchById_host =     "http://172.24.72.137/JITAPI/Smartwatch/GetByIP/";
-char* GetWatchByUserID_host = "http://172.24.72.137/JITAPI/Smartwatch/GetByUserId/";
+char* GetWatchById_host =     JITAPI_GET_WATCH_BY_ID_URL;
+char* GetWatchByUserID_host = JITAPI_GET_WATCH_BY_USERID_URL;
+
 
 
 char GetWatchById_Url[50] = {0};
@@ -164,6 +150,7 @@ char ip_address[15];
 
 String meuip;
 int Userid=0;
+
 HTTPClient http;
 StaticJsonDocument<200> result;
 StaticJsonDocument<200> userjson;
@@ -175,8 +162,6 @@ uint8_t counter = 0;
 uint8_t atual = 0;
 char bufatual [4];
 char buftotal [4];
-
-bool jitsupport_powermgm_loop_cb( EventBits_t event, void *arg );
 
 
 //------------OBJETOS GRAFICOS---------------
@@ -213,10 +198,8 @@ static lv_obj_t * btn1;
 static lv_obj_t * btn2;
 static lv_obj_t * btn3;
 
-
 static lv_obj_t * lbl_btn_status;
 static lv_obj_t * lbl_btn_team;
-
 
 static lv_obj_t * lbl_actualcard;
 static lv_obj_t * lbl_totalcard;
@@ -234,7 +217,7 @@ static lv_obj_t * btn_config;
 static lv_obj_t *btn_status;
 static lv_obj_t *btn_team;
 
-static lv_obj_t * lbl_Teamstatus[10];
+static lv_obj_t * lbl_TeamMembers[10];
 static lv_obj_t * lbl_team;
 
 
@@ -262,8 +245,6 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     lv_obj_add_style( jitsupport_cont, LV_OBJ_PART_MAIN, &stl_view );
     lv_obj_align( jitsupport_cont, jitsupport_app_main_tile, LV_ALIGN_CENTER, 0, 0 );
 
-
-
     //***************************
     // TOP HORIZONTAL LINE
 
@@ -273,6 +254,7 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     lv_line_set_points(line1, line_points, 2);     /*Set the points*/
     lv_obj_add_style(line1, LV_OBJ_PART_MAIN, &stl_topline);
     lv_obj_align(line1, NULL, LV_ALIGN_IN_TOP_MID, 0, 35);
+    
     // CARD BACKGROUND STYLE
     lv_style_init(&stl_bg_card);
     lv_style_set_bg_color(&stl_bg_card, LV_OBJ_PART_MAIN, LV_COLOR_YELLOW);
@@ -325,21 +307,25 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     lv_obj_set_height(status_card,167);
     lv_obj_add_style(status_card, LV_OBJ_PART_MAIN, &stl_view);
 
-    // LABEL NO CARD
+    //-----LABEL NO CARD----
  
     lbl_IP = lv_label_create(status_card, NULL);
     lv_label_set_text(lbl_IP, "0.0.0.0");
     lv_obj_align(lbl_IP, status_card, LV_ALIGN_IN_TOP_LEFT, 5, 20);
 
-    
+    //----- User Name-------
+
     lbl_UserName = lv_label_create(status_card, NULL);
     lv_label_set_text(lbl_UserName, "No Name Found");
     lv_obj_align(lbl_UserName, status_card, LV_ALIGN_IN_TOP_LEFT, 5, 40);
+
+    //---- AREA ---------
 
     lbl_Area = lv_label_create(status_card, NULL);
     lv_label_set_text(lbl_Area, "No Area Found");
     lv_obj_align(lbl_Area, status_card, LV_ALIGN_IN_TOP_LEFT, 5, 60);
     
+      //---- MQTT STATUS LABEL----
     
     lbl_MQTT = lv_label_create(status_card, NULL);
     lv_label_set_text(lbl_MQTT, "MQTT NOT CONNECTED !");
@@ -535,6 +521,8 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
     lv_obj_set_event_cb(btn_status, show_watch_status);
 
 
+    // ----- BTN TEAM-----
+
     btn_team= lv_btn_create(jitsupport_cont, NULL);
     lv_obj_set_width(btn_team,60);
     lv_obj_set_height(btn_team,35);
@@ -551,39 +539,29 @@ void jitsupport_app_main_setup( uint32_t tile_num ) {
 
     for( int a=0 ; a < 10;  a++)
     {
-          lbl_Teamstatus[a] = lv_label_create(team_card, NULL);
-          lv_label_set_text(lbl_Teamstatus[a],"");
-
+          lbl_TeamMembers[a] = lv_label_create(team_card, NULL);
+          lv_label_set_text(lbl_TeamMembers[a],"");
     }
 
-
-
-    // INIT CARD
+  // INIT CARD
 
     lv_obj_set_hidden(status_card,true);
     lv_obj_set_hidden(team_card,true); 
     mqttctrl_setup();
 
-
-    client.setServer(mqtt_server, MQTT_PORT);
-    client.setKeepAlive(MQTT_KEEPALIVE_SECONDS);
-    client.setCallback(MQTT_callback);
+  //---- Task para GET  USER
+  //   xTaskCreatePinnedToCore( Get_User,                                 /* Function to implement the task */
+    //                         "Get User",                                /* Name of the task */
+      //                        3000,                                     /* Stack size in words */
+        //                      NULL,                                     /* Task input parameter */
+          //                    0,                                        /* Priority of the task */
+            //                  &_Get_User_Task,                          /* Task handle. */
+              //                0 );
   
-    //---- Task para GET  USER
-     xTaskCreatePinnedToCore( Get_User,                                 /* Function to implement the task */
-                             "Get User",                                /* Name of the task */
-                              3000,                                     /* Stack size in words */
-                              NULL,                                     /* Task input parameter */
-                              0,                                        /* Priority of the task */
-                              &_Get_User_Task,                          /* Task handle. */
-                              0 );
-  
-
    mqqtctrl_register_cb(MQTT_DISCONNECTED_FLAG | MQTT_CONNECTED_FLAG, jitsupport_mqttctrl_event_cb,  "jitsupport Mqtt CB " );
    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, jitsupport_powermgm_loop_cb, "jitsupport app loop" );
    wifictl_register_cb( WIFICTL_CONNECT | WIFICTL_DISCONNECT | WIFICTL_OFF | WIFICTL_ON | WIFICTL_SCAN | WIFICTL_WPS_SUCCESS | WIFICTL_WPS_FAILED | WIFICTL_CONNECT_IP, jit_wifictl_event_cb, "JIT Wifi Event" );
    loginctrl_register_cb( LOGIN_DONE | LOGOUT_REQUEST | LOGOUT_DONE, login_jit_support_cb,"Login Jit Support");
-
 
 }
 
@@ -593,11 +571,13 @@ bool login_jit_support_cb(EventBits_t event, void *arg ){
     switch(event) {
         case LOGIN_DONE:
 
-         log_i("TEste de UserID %d",  arg); 
-  
+         log_i("TEste de UserID %d",  arg);   
           Userid=(int)arg;
           pegueiUser=false;
-                  //---- Task para GET  USER
+
+          clear_all_tickets();
+          
+          //---- Task para GET  USER
           xTaskCreatePinnedToCore( Get_UserByUserID,                                 /* Function to implement the task */
                                   "Get User",                                        /* Name of the task     */
                                   3000,                                              /* Task input parameter */
@@ -605,12 +585,14 @@ bool login_jit_support_cb(EventBits_t event, void *arg ){
                                   NULL,                                              /* Priority of the task */
                                   &_Get_UserBy_UserID_Task,                          /* Task handle.         */
                                   0 );
-
-
-  
-  
         break;
 
+        case LOGOUT_REQUEST:
+        
+        //---- Implementar funções de Logout aqui 
+
+                       
+        break;
     }
 
 return true;
@@ -635,12 +617,12 @@ void Get_UserByUserID(void * pvParameters)
                 vTaskDelay(1000/ portTICK_PERIOD_MS );
                 mqqtctrl_set_event(MQTT_START_CONNECTION);
 
-                xTaskCreatePinnedToCore( Get_TeamMembers,                               /* Function to implement the task */
-                                              "Get User",                               /* Name of the task */
-                                              5000,                                     /* Stack size in words */
-                                                NULL,                                   /* Task input parameter */
-                                                0,                                      /* Priority of the task */
-                                                &_Get_TeamMembers_Task,                 /* Task handle. */
+                xTaskCreatePinnedToCore( Get_TeamMembers,                              /* Function to implement the task */
+                                              "Get Team Members",                      /* Name of the task */
+                                              10000,                                   /* Stack size in words */
+                                                NULL,                                  /* Task input parameter */
+                                                0,                                     /* Priority of the task */
+                                                &_Get_TeamMembers_Task,                /* Task handle. */
                                                 0 );   
                 vTaskDelete(NULL);  
             }            
@@ -652,11 +634,10 @@ void Get_UserByUserID(void * pvParameters)
 }
 
 
-
 void Get_TeamMembers(void * pvParameters)
 {
 
-  char getpost[100]="http://172.24.72.137/JITAPI/Smartwatch/GetByTeam/";
+  char getpost[100]=JITAPI_GET_BY_TEAM_URL;
   char aux[4]="";
   sprintf(aux, "%d",idTeam);
   strcat(getpost, aux);
@@ -716,9 +697,9 @@ void Get_TeamMembers(void * pvParameters)
                         
                           for( int a=0 ; a < num;  a++)
                           {
-                                //lbl_Teamstatus[a] = lv_label_create(team_card, NULL);
-                                lv_label_set_text(lbl_Teamstatus[a], Team_Members[a].Member_Name);
-                                lv_obj_align(lbl_Teamstatus[a], NULL, LV_ALIGN_IN_TOP_LEFT, 10, 30 + 13*a);
+                                //lbl_TeamMembers[a] = lv_label_create(team_card, NULL);
+                                lv_label_set_text(lbl_TeamMembers[a], Team_Members[a].Member_Name);
+                                lv_obj_align(lbl_TeamMembers[a], NULL, LV_ALIGN_IN_TOP_LEFT, 10, 30 + 13*a);
                           }
                           
                           log_i("Task Team Member Deleted !");
@@ -756,7 +737,7 @@ void Get_User(void * pvParameters)
                 mqqtctrl_set_event(MQTT_START_CONNECTION);
 
                 xTaskCreatePinnedToCore( Get_TeamMembers,                               /* Function to implement the task */
-                                              "Get User",                               /* Name of the task */
+                                              "Get Team Members",                               /* Name of the task */
                                               5000,                                     /* Stack size in words */
                                                 NULL,                                   /* Task input parameter */
                                                 0,                                      /* Priority of the task */
@@ -771,18 +752,23 @@ void Get_User(void * pvParameters)
 
 }
 
+
+//Need to connect function 
+
 bool jit_wifictl_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
         case WIFICTL_CONNECT:
 
-        log_i("AI CONNECTED");
+        log_i("CONNECTED");
+
+        
 
         break;
 
 
         default:
         
-        log_i("AI DISCONNECTED");
+        log_i("DISCONNECTED");
 
         break;
         
@@ -976,8 +962,7 @@ void MQTT_callback(char* topic, byte* message, unsigned int length) {
             
             log_i("Reset Update Received");
             update_check_version(); 
-    
-            
+             
           }
 
         }
@@ -990,7 +975,6 @@ void MQTT_callback(char* topic, byte* message, unsigned int length) {
     }
  
 }
-
 
 
 uint8_t get_number_tickets()
@@ -1120,6 +1104,35 @@ Ticket_t *remove_ticket(Ticket_t *ticket_remover)
 }
 
 
+void clear_all_tickets()
+ {
+   
+    // -----Clear Tickets-----
+    
+    for(int i=0; i< MAX_NUMBER_TICKETS; i++)
+    {
+            strcpy(all_Tickets[i].ticket_id,"");
+            all_Tickets[i].state=EMPTY;
+    } 
+
+    // -----Toggle OFF Cards-----   
+
+    if(get_number_tickets()==0){
+      log_i("Number Tickets=0");
+      toggle_Cards_Off();
+    }
+    //--Clear Cards Counter ----- 
+
+    sprintf(bufatual, "%d", 0);
+    sprintf(buftotal, "%d",get_number_tickets());
+
+    lv_label_set_text(lbl_actualcard,bufatual);
+    lv_label_set_text(lbl_totalcard,buftotal);
+
+}
+
+
+
 //----------------APP FUNCTIONS---------------------------- 
 
 void getWatchUser(){
@@ -1230,9 +1243,10 @@ void getWatchUser(){
 
 void getWatchUserByUserID(){
 
+    StaticJsonDocument<512> resp;
+    
     meuip = WiFi.localIP().toString();
     meuip.toCharArray(ip_address,15);
-
 
 
     String userid= String(Userid);
@@ -1249,7 +1263,6 @@ void getWatchUserByUserID(){
     log_i("ENDEREÇO DE API:");
     log_i("%s",GetWatchById_Url); 
 
-  
         
         http.begin(GetWatchById_Url); //HTTP
         httpCode = http.GET();
@@ -1261,56 +1274,65 @@ void getWatchUserByUserID(){
             if(httpCode == HTTP_CODE_OK) {
                 
                 String payload = http.getString();
-                deserializeJson(result, payload);
+                DeserializationError error = deserializeJson(resp, payload);
 
-                idTeam = result["teamId"];
-                log_i("ID do time getwatch:");
-                log_i("%d",idTeam);
-                           
-                String numerotopico = String(idTeam);       
-                
-                NomeTopicoReceber = "receber/" + numerotopico;
-                NomeTopicoAtualizar = "atualizar/" + numerotopico;
-                
-                log_i("Nome Topico Receber:");
-                log_i("%s",NomeTopicoReceber);
-                log_i("Nome Topico Atualizar:");            
-                log_i("%s",NomeTopicoAtualizar);
-                
-                NomeTopicoReceber.toCharArray(nometopico,15);
-                NomeTopicoAtualizar.toCharArray(atualizartopico,15);
+                if(error)
+                {
+                    log_i("getWatchUserByUserID Json error: %s", error.f_str()); 
 
-                auto user = result["user"].as<const char*>();
-                auto area = result["area"].as<const char*>();
-                log_i("%s",user);
+                }
+                else
+                { 
+            
+                    idTeam = resp["teamId"];
+                    log_i("ID do time getwatch:");
+                    log_i("%d",idTeam);
+                              
+                    String numerotopico = String(idTeam);       
+                    
+                    NomeTopicoReceber = "receber/" + numerotopico;
+                    NomeTopicoAtualizar = "atualizar/" + numerotopico;
+                    
+                    log_i("Nome Topico Receber:");
+                    log_i("%s",NomeTopicoReceber);
+                    log_i("Nome Topico Atualizar:");            
+                    log_i("%s",NomeTopicoAtualizar);
+                    
+                    NomeTopicoReceber.toCharArray(nometopico,15);
+                    NomeTopicoAtualizar.toCharArray(atualizartopico,15);
 
-                StaticJsonDocument<256> userObj;
-                StaticJsonDocument<256> areaObj;
-                deserializeJson(userObj, user);
-                deserializeJson(areaObj, area);
+                    auto user = resp["user"].as<const char*>();
+                    auto area = resp["area"].as<const char*>();
+                    log_i("%s",user);
 
-                auto id = userObj[0]["id"].as<int>();
-                auto text = userObj[0]["text"].as<const char*>();
-                auto my_local = areaObj[0]["text"].as<const char*>();
+                    StaticJsonDocument<256> userObj;
+                    StaticJsonDocument<256> areaObj;
+                    deserializeJson(userObj, user);
+                    deserializeJson(areaObj, area);
 
-                strcpy(nomefull,text);
+                    auto id = userObj[0]["id"].as<int>();
+                    auto text = userObj[0]["text"].as<const char*>();
+                    auto my_local = areaObj[0]["text"].as<const char*>();
 
-                log_i("%d",id);
-                log_i("%s",text);
-                log_i("%s",my_local);
+                    strcpy(nomefull,text);
 
-                lv_label_set_text(lbl_UserName,text);
-                lv_label_set_text(lbl_Area, my_local);
+                    log_i("%d",id);
+                    log_i("%s",text);
+                    log_i("%s",my_local);
 
-                NomeTopicoArea = "general/" + String(my_local);  
-                NomeTopicoArea.toCharArray(areatopico,30);
-                pegueiUser = true;
+                    lv_label_set_text(lbl_UserName,text);
+                    lv_label_set_text(lbl_Area, my_local);
 
-                
-              } else {
-                  log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-                  pegueiUser = false;
+                    NomeTopicoArea = "general/" + String(my_local);  
+                    NomeTopicoArea.toCharArray(areatopico,30);
+                    pegueiUser = true;
               }
+                
+            } 
+            else {
+                log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+                pegueiUser = false;
+            }
 
         http.end();
 
@@ -1449,8 +1471,7 @@ static void btn2_handler(lv_obj_t *obj, lv_event_t event)
         log_i("%d",counter);
         printCard3(atual-1,VIBRATION_DISABLE);
     }
-   
-    
+  
 }
 
 
@@ -1477,11 +1498,8 @@ void sendCanceled(lv_obj_t *obj, lv_event_t event){
       requestBody.toCharArray(payload,MQTT_PUBLISH_PAYLOAD_SIZE);
 
       MQTT2_publish(atualizartopico, payload);
-
   }
-
 }
-
 
 void sendRequest(lv_obj_t *obj, lv_event_t event){
 
@@ -1507,37 +1525,28 @@ void sendRequest(lv_obj_t *obj, lv_event_t event){
 
       MQTT2_publish(atualizartopico, payload);
 
-
   }
 
 }
 
-
-
 void show_watch_status(lv_obj_t *obj, lv_event_t event){
 
+    if (event == LV_EVENT_CLICKED) {
+      
+            if(lv_obj_get_hidden(status_card)==true)
+            {
+                lv_obj_set_hidden(status_card,false);
+                lv_obj_set_hidden(bg_card,true);
+                lv_obj_set_hidden(team_card,true); 
+            }
+            else
+            {              
+                lv_obj_set_hidden(status_card,true);
+                lv_obj_set_hidden(team_card,true); 
+                if(get_number_tickets()>0)lv_obj_set_hidden(bg_card,false);
 
-if (event == LV_EVENT_CLICKED) {
-
-        
-          if(lv_obj_get_hidden(status_card)==true)
-          {
-              lv_obj_set_hidden(status_card,false);
-              lv_obj_set_hidden(bg_card,true);
-              lv_obj_set_hidden(team_card,true); 
-
-
-          }
-          else
-          {
-              
-              lv_obj_set_hidden(status_card,true);
-              lv_obj_set_hidden(team_card,true); 
-              if(get_number_tickets()>0)lv_obj_set_hidden(bg_card,false);
-
-
-          }
-}
+            }
+    }
 }
 
 
@@ -1562,7 +1571,6 @@ if (event == LV_EVENT_CLICKED) {
               if(get_number_tickets()>0)lv_obj_set_hidden(bg_card,false);  
 
           }
-   
       
 }
 

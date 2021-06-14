@@ -124,12 +124,12 @@ void jit_pairing_tile_setup( void ) {
     lv_textarea_set_accepted_chars( jit_pairing_code_textfield, "-.0123456789.");
     lv_textarea_set_one_line( jit_pairing_code_textfield, true);
     lv_textarea_set_cursor_hidden( jit_pairing_code_textfield, true);
-
     lv_obj_set_width( jit_pairing_code_textfield, lv_disp_get_hor_res( NULL ) / 2 );
     lv_obj_set_height( jit_pairing_code_textfield, lv_disp_get_ver_res( NULL ) / 2 );
     lv_obj_align( jit_pairing_code_textfield, jit_pairing_tile, LV_ALIGN_CENTER, -40, 50);
 
-    //Add button for SPIFFS format
+    //Login Buttton 
+
     login_btn = lv_btn_create( jit_pairing_tile, NULL);
     lv_obj_set_event_cb( login_btn, login_btn_event_cb );
     lv_obj_set_size( login_btn, 60, 35);
@@ -137,7 +137,6 @@ void jit_pairing_tile_setup( void ) {
     lv_obj_align( login_btn, jit_pairing_code_textfield, LV_ALIGN_OUT_RIGHT_MID, 15, -40);
     lv_obj_t *login_btn_label = lv_label_create( login_btn, NULL );
     lv_label_set_text( login_btn_label, "LOGIN");
-
     lv_obj_set_event_cb( jit_pairing_code_textfield, jabil_pairing_num_textarea_event_cb );
 
     xLoginCtrlEvent=xEventGroupCreate();
@@ -181,7 +180,7 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
 
             if(pmu_is_vbus_plug() || (start_login_flag==true))
             {
-                //start_login_flag=true;
+                start_login_flag=true;
                 jit_pairing_login_screen();
             }
             else
@@ -204,6 +203,11 @@ bool jit_pairing_powermgm_loop_cb( EventBits_t event, void *arg ) {
 
                 if(pmu_is_vbus_plug())
                 {
+                     
+                    loginctrl_clear_event(LOGIN_DONE);
+                    loginctrl_set_event(LOGOUT_REQUEST);
+                    loginctrl_send_event_cb( LOGOUT_REQUEST, (int *)UserID );
+                    
                     //jit_pairing_login_screen();
                     login_state=LOGIN_CLEAN;
                 }
@@ -227,7 +231,6 @@ static void jabil_pairing_num_textarea_event_cb ( lv_obj_t * obj, lv_event_t eve
 
         char token[10];
         num_keyboard_set_textarea(obj);
-
 
         if(strcmp(token,"123456")==0)
         {          
@@ -253,15 +256,24 @@ static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event){
 
         strlcpy( token, lv_textarea_get_text( jit_pairing_code_textfield), sizeof(token) );
         log_i("Peguei o token: %s",token);
-
+     
+        if(strcmp(token,"123456")==0)
+        {          
+            mainbar_jump_to_maintile( LV_ANIM_OFF );
+            start_login_flag=false;
+            login_state=CHECK_FOR_LOGOUT;
+            break;
+        }
+        
         //---- Task para Reestabelecimento da Conexão MQTT
         xTaskCreatePinnedToCore( login_task,                               /* Function to implement the task */
                                 "login_Task",                                 /* Name of the task */
                                 5000,                                         /* Stack size in words */
                                 NULL,                                         /* Task input parameter */
-                                2,                                            /* Priority of the task */
+                                1,                                            /* Priority of the task */
                                 &_login_task,                              /* Task handle. */
-                                0);      
+                                0);            
+        
         break;
     }
 
@@ -275,9 +287,7 @@ void login_task(void * pvParameters)
 
   while(1)
   {           
-      lv_label_set_text( jit_pairing_status_label, "CHECKING TOKEN...");
-      vTaskDelay(1000/ portTICK_PERIOD_MS );
-      
+      lv_label_set_text( jit_pairing_status_label, "CHECKING TOKEN...");      
       if(check_token())
       {
         // LOGIN SUCCESS 
@@ -286,7 +296,7 @@ void login_task(void * pvParameters)
         loginctrl_send_event_cb( LOGIN_DONE, (int *)UserID );
 
         lv_label_set_text( jit_pairing_status_label, "OK READY TO GO... WELCOME !");          
-        vTaskDelay(1000/ portTICK_PERIOD_MS );
+        vTaskDelay(500/ portTICK_PERIOD_MS );
         start_login_flag=false;
         login_state=CHECK_FOR_LOGOUT;
         mainbar_jump_to_maintile( LV_ANIM_OFF );
@@ -299,19 +309,20 @@ void login_task(void * pvParameters)
 }
 
 bool check_token(){
-        
+           
     if(wifi_connected==1)
     {
             
         HTTPClient http;
         char post[100];
         http.begin(LOGIN_API_URL);
+        http.setTimeout(3000);
         http.addHeader("Content-Type", "application/json");
 
         //---------- Create JSON POST-----------
         StaticJsonDocument<200> doc;
         doc["token"] = token;
-        doc["mac"] = "BRBELME024";
+        //doc["mac"] = "BRBELME024";
     
         String postBody;
         serializeJson(doc, postBody);
@@ -371,7 +382,7 @@ bool check_token(){
                 lv_label_set_text( jit_pairing_status_label, Message);
                 http.end();
 
-                  return false;
+                return false;
               }
     }
     else
@@ -385,7 +396,6 @@ bool check_token(){
 return true;
           
 }
-
 
 void loginctrl_set_event( EventBits_t bits ){
     xEventGroupSetBits( xLoginCtrlEvent, bits);

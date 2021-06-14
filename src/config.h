@@ -58,7 +58,6 @@
     extern volatile int wifi_connected;
     extern int boot_finish;
 
-
     //------MQTT---CONNECTION------
     //#define MQTT_BROKER_MOSQUITTO                        
     //#define MQTT_BROKER_CLOUD    
@@ -95,7 +94,6 @@
     #define MQTT_CLEAN_SESSION                          0    
     #endif
 
-
     #define CHECK_MQTT_CONNECTION_MILLI_SECONDS          5000
     #define WIFI_TENTATIVES_TO_RECONNECT                 20                         //before go to sleep 
 
@@ -113,17 +111,32 @@
     //#define WIFI_PASSWORD        "3348981600"
 
 
+   //--------------JABIL API-----------------
+
+#define BRBELM0APPS99
+
+#ifdef BRBELM0APPS99
+
     #define FIRMWARE_UPDATE_URL            "http://172.24.72.137:3089/params"
     #define LOGIN_API_URL                  "http://172.24.72.137:3089/login" 
 
-          
+#endif
+
+#ifdef BRBELIE031
+
+    #define FIRMWARE_UPDATE_URL            "http://172.24.73.44:3089/params"
+    #define LOGIN_API_URL                  "http://172.24.73.44:3089/login" 
+
+#endif
+
+    #define JITAPI_GET_BY_TEAM_URL          "http://172.24.72.137/JITAPI/Smartwatch/GetByTeam/"
+    #define JITAPI_GET_WATCH_BY_ID_URL      "http://172.24.72.137/JITAPI/Smartwatch/GetByIP/"
+    #define JITAPI_GET_WATCH_BY_USERID_URL  "http://172.24.72.137/JITAPI/Smartwatch/GetByUserId/"
+
+//------------OPTIONS----------------
 
     #define AUTO_UPDATE_AND_RESTART                    
-
     #define JABIL_SILENCE_WAKEUP_INTERVAL                       5
-
-
-
 
     #ifdef __cplusplus
         #include <LilyGoWatch.h>

@@ -165,11 +165,11 @@ void wifictl_setup( void ) {
         wifictl_set_event( WIFICTL_ACTIVE );
         wifictl_clear_event( WIFICTL_CONNECT | WIFICTL_OFF_REQUEST | WIFICTL_ON_REQUEST );
         if ( wifictl_get_event( WIFICTL_WPS_REQUEST ) ) {
-            wifictl_send_event_cb( WIFICTL_ON, (void *)"wait for WPS" );
+            wifictl_send_event_cb( WIFICTL_ON, (void *)"wait for WPS");
         }
         else {
             wifictl_set_event( WIFICTL_SCAN );
-            wifictl_send_event_cb( WIFICTL_ON, (void *)"scan ..." );
+            wifictl_send_event_cb( WIFICTL_ON, (void *)"scan ...");
             //WiFi.scanNetworks( true );
             WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
         }
@@ -253,7 +253,7 @@ void wifi_restablish_Task( void * pvParameters)
                 ct_Wifi_retry=0;
                 wifi_connected=1;
                 Serial.println("Wifi Reestabelecido !!");
-                wifictl_set_event( WIFICTL_CONNECT | WIFICTL_ACTIVE );
+                wifictl_set_event( WIFICTL_CONNECT );
                 vTaskSuspend( _wifi_restabilsh_Task);
               }
 
@@ -325,6 +325,7 @@ bool wifictl_powermgm_loop_event_cb( EventBits_t event, void *arg )
     switch(event) {
           case POWERMGM_STANDBY:
 
+              
               if(ct_Wifi_retry>WIFI_TENTATIVES_TO_RECONNECT)
               {            
                   // Ajuda no quesito Desligar o SCAN do wifi imediatamente após estourar o número de tentativas
@@ -337,6 +338,7 @@ bool wifictl_powermgm_loop_event_cb( EventBits_t event, void *arg )
 
           case POWERMGM_WAKEUP:
                 
+            if(WiFi.status() == WL_CONNECTED) wifi_connected=1;
 
           break;
 
@@ -346,14 +348,6 @@ bool wifictl_powermgm_loop_event_cb( EventBits_t event, void *arg )
           break;
         }
 }
-
-
-
-
-
-
-
-
 
 
 

@@ -21,7 +21,6 @@
  */
 #include "config.h"
 #include "HTTPClient.h"
-
 #include "update_check_version.h"
 
 #include "utils/json_psram_allocator.h"
