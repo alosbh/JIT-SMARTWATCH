@@ -36,6 +36,7 @@
 #include "hardware/display.h"
 #include "hardware/powermgm.h"
 #include "hardware/motor.h"
+#include "utils/jit_sync/jit_pairing.h"
 
 
 //***************  MQTT ******************//
@@ -127,7 +128,7 @@ void mqttctrl_setup()
                              "Mqtt Contrl",                                 /* Name of the task */
                               2000,                                         /* Stack size in words */
                               NULL,                                         /* Task input parameter */
-                              1,                                            /* Priority of the task */
+                              2,                                            /* Priority of the task */
                               &_mqttCtrl_Task,                              /* Task handle. */
                               0);
    //vTaskSuspend(_mqttCtrl_Task);
@@ -355,7 +356,6 @@ void Mqtt_Ctrl_task(void * pvParameters)
 {  
     EventBits_t xBits;
 
-  
     while(1)
     {     
           xBits=xEventGroupWaitBits(xMqttCtrlEvent,MQTT_DISCONNECTED_FLAG, pdTRUE,pdTRUE,portMAX_DELAY); 

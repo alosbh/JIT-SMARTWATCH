@@ -571,7 +571,7 @@ bool login_jit_support_cb(EventBits_t event, void *arg ){
     switch(event) {
         case LOGIN_DONE:
 
-         log_i("TEste de UserID %d",  arg);   
+         log_i("Teste de UserID %d",  arg);   
           Userid=(int)arg;
           pegueiUser=false;
 
@@ -580,7 +580,7 @@ bool login_jit_support_cb(EventBits_t event, void *arg ){
           //---- Task para GET  USER
           xTaskCreatePinnedToCore( Get_UserByUserID,                                 /* Function to implement the task */
                                   "Get User",                                        /* Name of the task     */
-                                  3000,                                              /* Task input parameter */
+                                  10000,                                              /* Task input parameter */
                                   0,                                                 /* Stack size in words  */
                                   NULL,                                              /* Priority of the task */
                                   &_Get_UserBy_UserID_Task,                          /* Task handle.         */
@@ -607,12 +607,13 @@ void Get_UserByUserID(void * pvParameters)
           if(wifictl_get_event( WIFICTL_CONNECT ))
           {
             if(!pegueiUser)getWatchUserByUserID();
+             //if(!pegueiUser)getWatchUser();
             else
             {             
 
                 MQTT2_set_client(ip_address);
                 MQTT2_set_subscribe_topics(nometopico,atualizartopico,areatopico);
-                
+
                 log_i("setando evento de conexão mqtt");
                 vTaskDelay(1000/ portTICK_PERIOD_MS );
                 mqqtctrl_set_event(MQTT_START_CONNECTION);
@@ -623,7 +624,9 @@ void Get_UserByUserID(void * pvParameters)
                                                 NULL,                                  /* Task input parameter */
                                                 0,                                     /* Priority of the task */
                                                 &_Get_TeamMembers_Task,                /* Task handle. */
-                                                0 );   
+                                                0 ); 
+
+                login_done();  
                 vTaskDelete(NULL);  
             }            
           }

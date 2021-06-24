@@ -39,6 +39,7 @@
 
 
     void jit_pairing_tile_setup( void );
+    void login_done();
 
     bool loginctrl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
 

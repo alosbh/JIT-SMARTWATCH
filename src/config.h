@@ -113,12 +113,19 @@
 
    //--------------JABIL API-----------------
 
-#define BRBELM0APPS99
+#define BRBELM0MAT81
 
 #ifdef BRBELM0APPS99
 
     #define FIRMWARE_UPDATE_URL            "http://172.24.72.137:3089/params"
     #define LOGIN_API_URL                  "http://172.24.72.137:3089/login" 
+
+#endif
+
+#ifdef BRBELM0MAT81
+
+    #define FIRMWARE_UPDATE_URL            "http://10.57.16.20:3089/params"
+    #define LOGIN_API_URL                  "http://10.57.16.20:3089/login" 
 
 #endif
 

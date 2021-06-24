@@ -73,6 +73,7 @@ int UserID;
 
 void login_task(void * pvParameters);
 bool check_token();
+void login_done();
 
 EventGroupHandle_t xLoginCtrlEvent=NULL;
 callback_t *loginctrl_callback = NULL;
@@ -249,6 +250,18 @@ static void exit_jit_pairing_event_cb( lv_obj_t * obj, lv_event_t event ) {
     }
 }
 
+
+void login_done()
+{
+    lv_label_set_text( jit_pairing_status_label, "OK READY TO GO... WELCOME !");
+    vTaskDelay(500/ portTICK_PERIOD_MS );
+    start_login_flag=false;
+    login_state=CHECK_FOR_LOGOUT;
+    mainbar_jump_to_maintile( LV_ANIM_OFF );
+
+}
+
+
 static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event){
 
     switch( event ) {
@@ -257,6 +270,28 @@ static void login_btn_event_cb(lv_obj_t * obj, lv_event_t event){
         strlcpy( token, lv_textarea_get_text( jit_pairing_code_textfield), sizeof(token) );
         log_i("Peguei o token: %s",token);
      
+        if(strlen(token)==4)
+        {
+           // Usuario Forneceu diretamente um User ID
+          if(wifi_connected==1)
+           {       
+
+          // LOGIN SUCCESS 
+            int UserID= atoi(token);
+            loginctrl_set_event(LOGIN_DONE);
+            loginctrl_send_event_cb( LOGIN_DONE, (int *)UserID );          
+            lv_label_set_text( jit_pairing_status_label, "CHECKING TOKEN...");          
+
+            return;
+           }
+           else
+           {
+            lv_label_set_text( jit_pairing_status_label, "No Wifi !");
+            break;
+           }
+        }
+        
+        
         if(strcmp(token,"123456")==0)
         {          
             mainbar_jump_to_maintile( LV_ANIM_OFF );
@@ -352,7 +387,7 @@ bool check_token(){
 
                 
                 const char* Status = doc["Status"];
-                bool Success = doc["Success"];
+                bool Success = doc["success"];
                 UserID = doc["UserId"]; 
 
                 lv_label_set_text( jit_pairing_status_label, Status);
