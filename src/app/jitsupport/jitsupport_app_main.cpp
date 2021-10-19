@@ -1515,10 +1515,17 @@ void sendRequest(lv_obj_t *obj, lv_event_t event){
       
       log_i("ESTE AQUI EH NOME ATUAL:");
       log_i("%s",nomefull);
+
+      String idUser= String(Userid);
+      // char user_id[8];
+      // userid.toCharArray(user_id,8);
+
       doc2["TicketId"] = all_Tickets[atual-1].ticket_id;
       doc2["UserName"] = nomefull;
       doc2["Status"] = "Accepted";
       doc2["Ip"] = ip_address;
+      doc2["userID"] = idUser;
+
       String requestBody;
       serializeJson(doc2, requestBody);
   

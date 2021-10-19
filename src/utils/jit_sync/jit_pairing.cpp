@@ -105,7 +105,7 @@ void jit_pairing_tile_setup( void ) {
 
     jit_pairing_info_label = lv_label_create( jit_pairing_tile, NULL);
     lv_obj_add_style( jit_pairing_info_label, LV_OBJ_PART_MAIN, &jit_pairing_style  );
-    lv_label_set_text( jit_pairing_info_label, "INSERT TOKEN");
+    lv_label_set_text( jit_pairing_info_label, "INSERT YOUR TOKEN");
     lv_obj_align( jit_pairing_info_label, jit_pairing_img, LV_ALIGN_IN_BOTTOM_MID, 0, 5 );
 
     jit_pairing_status_label = lv_label_create( jit_pairing_tile, NULL);
@@ -153,7 +153,7 @@ bool jit_pairing_login_screen() {
     statusbar_hide( true );
     powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
     mainbar_jump_to_tilenumber( jit_pairing_tile_num, LV_ANIM_OFF );
-    lv_label_set_text( jit_pairing_info_label, "INSERT TOKEN" );
+    lv_label_set_text( jit_pairing_info_label, "INSERT YOUR TOKEN" );
     lv_obj_align( jit_pairing_info_label, jit_pairing_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
     lv_obj_invalidate( lv_scr_act() );
     //motor_vibe(20);
