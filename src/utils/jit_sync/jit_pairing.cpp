@@ -140,6 +140,11 @@ void jit_pairing_tile_setup( void ) {
     lv_label_set_text( login_btn_label, "LOGIN");
     lv_obj_set_event_cb( jit_pairing_code_textfield, jabil_pairing_num_textarea_event_cb );
 
+    lv_obj_t *jit_pairing_battery_label = lv_label_create( jit_pairing_tile, NULL);
+    lv_obj_add_style( jit_pairing_battery_label, LV_OBJ_PART_MAIN, &jit_pairing_style  );
+    lv_label_set_text( jit_pairing_battery_label, "99");
+    lv_obj_align( jit_pairing_battery_label, jit_pairing_img, LV_ALIGN_IN_BOTTOM_MID, 0, 50 );
+
     xLoginCtrlEvent=xEventGroupCreate();
     loginctrl_clear_event(LOGIN_DONE|LOGOUT_REQUEST|LOGOUT_DONE); 
 
